@@ -3,11 +3,12 @@ import cadquery as cq
 table_depth = 60
 table_length = 120
 table_height = 86
-table_top_thickness = 1
+table_top_thickness = 2
 leg_width = 4
 panel_height = 20
 drawer_widths = [70, 35]
 drawer_height = 12
+
 panel_thickness = leg_width
 side_panel_length = table_depth - 2 * leg_width
 front_panel_length = table_length - 2 * leg_width
@@ -25,14 +26,21 @@ def make_leg():
 def make_side_panel():
     return cq.Workplane().box(side_panel_length, panel_thickness, panel_height)
 
+def make_rear_panel():
+    return cq.Workplane().box(front_panel_length, panel_thickness, panel_height)
+
+def make_face_frame():
+    face_frame = make_rear_panel()
+    drawer_x = -front_panel_length / 2
+    for drawer_width in drawer_widths:
+        drawer_x += drawer_width / 2 + drawer_lateral_border_width
+        face_frame = face_frame.faces('>Y').workplane(offset=1, centerOption="CenterOfBoundBox").move(drawer_x, 0).rect(
+            drawer_width, drawer_height).cutThruAll()
+        drawer_x += drawer_width / 2
+    return face_frame
+
 table_top = cq.Workplane().box(table_depth, table_length, table_top_thickness)
-face_frame = cq.Workplane().box(front_panel_length, panel_thickness, panel_height)
-face_frame_original = face_frame
-drawer_x = -front_panel_length/2
-for drawer_width in drawer_widths:
-    drawer_x += drawer_width/2 + drawer_lateral_border_width
-    face_frame = face_frame.faces('>Y').workplane(offset=1, centerOption="CenterOfBoundBox").move(drawer_x, 0).rect(drawer_width, drawer_height).cutThruAll()
-    drawer_x += drawer_width/2
+
 
 
 assy = (
@@ -65,10 +73,15 @@ assy = (
  .constrain('table_top@faces@<Y', 'side_panel2@faces@>Y', 'Axis')
  .constrain('leg3@vertices@>(1,1,1)', 'side_panel2@vertices@>(-1,1,1)', 'Point')
  )
-(assy.add(face_frame, name='face_frame')
+(assy.add(make_face_frame(), name='face_frame')
  .constrain('table_top@faces@<Z', 'face_frame@faces@>Z', 'Axis')
  .constrain('table_top@faces@>Y', 'face_frame@faces@>X', 'Axis')
  .constrain('leg4@vertices@>(-1,-1,1)', 'face_frame@vertices@>(-1,1,1)', 'Point')
+ )
+(assy.add(make_rear_panel(), name='rear_panel')
+ .constrain('table_top@faces@<Z', 'rear_panel@faces@>Z', 'Axis')
+ .constrain('table_top@faces@>Y', 'rear_panel@faces@>X', 'Axis')
+ .constrain('leg3@vertices@>(1,-1,1)', 'rear_panel@vertices@>(-1,1,1)', 'Point')
  )
 assy.solve()
 show_object(assy)
