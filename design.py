@@ -41,11 +41,12 @@ def make_face_frame():
 
 table_top = cq.Workplane().box(table_depth, table_length, table_top_thickness)
 
-
+wood_color = cq.Color(203/255, 175/255, 117/255)
+white = cq.Color('white')
 
 assy = (
-    cq.Assembly()
-        .add(table_top, name='table_top', loc=cq.Location((0, 0, 0)))
+    cq.Assembly(color=white)
+        .add(table_top, name='table_top', loc=cq.Location((0, 0, 0)), color=wood_color)
         .add(make_leg(), name='leg1')
         .add(make_leg(), name='leg2')
         .add(make_leg(), name='leg3')
