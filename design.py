@@ -14,6 +14,8 @@ leg_width = std_thickness
 panel_height = 20
 drawer_widths = [70, 35]
 drawer_height = 12
+m5_diameter = 0.5
+bolt_length = 5
 
 panel_thickness = std_thickness
 side_panel_length = table_depth - 2 * leg_width
@@ -27,8 +29,45 @@ wall_frame_board_width = in_to_cm(4)
 wall_frame_board_depth = std_thickness
 shelf_height = 185
 shelf_depth = 25
+wall_frame_screw_inset = 3
+wall_frame_screw_spacing = wall_frame_board_width - wall_frame_screw_inset
 wall_frame_height = (shelf_height + shelf_backboard_height - table_height + table_top_thickness + panel_height)
 
+
+def make_shelf():
+    shelf = cq.Workplane().box(shelf_depth, table_length, std_thickness)
+    hole_heights = [wall_frame_screw_inset]
+    hole_heights.append((shelf_depth / 2))
+    hole_locations = [(-shelf_depth / 2 + hh, side*(table_length-std_thickness)/2) for hh in
+                      hole_heights for side in [1, -1]]
+    # hole_locations = [(shelf_depth/2 - wall_frame_screw_inset, 0)]
+    shelf = shelf.faces('>Z').workplane(centerOption="CenterOfBoundBox").pushPoints(hole_locations).hole(
+        m5_diameter / 2, bolt_length)
+    shelf.faces('>Z').edges('%CIRCLE').edges('<X').edges('>Y').tag('screw_front_left')
+    shelf.faces('>Z').edges('%CIRCLE').edges('>X').edges('>Y').tag('screw_rear_left')
+    shelf.faces('>Z').edges('%CIRCLE').edges('<X').edges('<Y').tag('screw_front_right')
+    shelf.faces('>Z').edges('%CIRCLE').edges('>X').edges('<Y').tag('screw_rear_right')
+    return shelf
+
+def make_shelf_support():
+    board = cq.Workplane().box(shelf_depth, std_thickness, wall_frame_board_width)
+    hole_heights = [wall_frame_screw_inset]
+    hole_heights.append((wall_frame_board_width - wall_frame_screw_inset))
+    hole_locations = [(0, wall_frame_board_width / 2 - hh) for hh in
+                      hole_heights]
+    board = board.faces('>X').workplane().pushPoints(hole_locations).hole(m5_diameter / 2, bolt_length)
+    hole_heights = [wall_frame_screw_inset]
+    hole_heights.append((shelf_depth/2))
+    hole_locations = [(-shelf_depth/2 + hh, 0) for hh in
+                      hole_heights]
+    # hole_locations = [(shelf_depth/2 - wall_frame_screw_inset, 0)]
+    board = board.faces('<Z').workplane(centerOption="CenterOfBoundBox").pushPoints(hole_locations).hole(m5_diameter / 2, bolt_length)
+    board.faces('<Z').edges('%CIRCLE').edges('<X').tag('screw_front')
+    board.faces('<Z').edges('%CIRCLE').edges('>X').tag('screw_rear')
+    board.faces('>X').edges('%CIRCLE').edges('>Z').tag('screw_top')
+    board.faces('>X').edges('%CIRCLE').edges('<Z').tag('screw_bottom')
+    # board.faces('<Z').edges('%CIRCLE').edges('<X').edges('<Y').tag('screw_front_right')
+    return board
 
 def make_leg():
     leg = cq.Workplane('XY').rect(leg_width, leg_width).extrude(leg_length)
@@ -55,7 +94,15 @@ def make_face_frame():
 
 
 def make_wall_frame_vertical_board():
-    return cq.Workplane().box(wall_frame_board_depth, wall_frame_board_width, wall_frame_height)
+    board = cq.Workplane().box(wall_frame_board_depth, wall_frame_board_width, wall_frame_height)
+    # board = board.faces('>X').workplane().hole(m5_diameter/2)
+    hole_heights = [wall_frame_screw_inset]
+    hole_heights.append((wall_frame_board_width - wall_frame_screw_inset))
+    hole_heights.append((wall_frame_height-hole_heights[0]))
+    hole_heights.append((wall_frame_height-hole_heights[1]))
+    hole_locations = [(wall_frame_board_width/2-std_thickness/2, wall_frame_height/2 - hh) for hh in hole_heights]
+    board = board.faces('>X').workplane().pushPoints(hole_locations).hole(m5_diameter/2, bolt_length)
+    return board
 
 
 def make_wall_frame_horizontal_board():
@@ -83,10 +130,21 @@ top_assy = (
     .constrain('v_l@faces@+Z', 'v_r@faces@+Z', 'Axis')
         .constrain('v_l@faces@<Y', 'v_r@faces@<Y', 'Axis')
         .constrain('h_t@vertices@>(1,1,-1)', 'v_r@vertices@>(1,-1,-1)', 'Point')
+    .add(make_shelf(), name='shelf')
+    .constrain('h_t@faces@+Z', 'shelf@faces@+Z', 'Axis')
+        .constrain('h_t@faces@+Y', 'shelf@faces@+Y', 'Axis')
+    .add(make_shelf_support(), name='shelf_support_left')
+    .constrain('shelf?screw_front_left', 'shelf_support_left?screw_front', 'Point')
+    .constrain('shelf?screw_rear_left', 'shelf_support_left?screw_rear', 'Plane')
+        .add(make_shelf_support(), name='shelf_support_right')
+        .constrain('shelf?screw_front_right', 'shelf_support_right?screw_front', 'Point')
+        .constrain('shelf?screw_rear_right', 'shelf_support_right?screw_rear', 'Plane')
+    # .constrain('shelf@faces@+Z', 'shelf_support_left@faces@+Z', 'Axis')
+    # .constrain('h_t', )
 )
 top_assy.solve()
 
-assy = (
+table_assy = (
     cq.Assembly(color=white)
         .add(table_top, name='table_top', loc=cq.Location((0, 0, 0)), color=wood_color)
         .add(make_leg(), name='leg1')
@@ -106,26 +164,43 @@ assy = (
         .constrain('table_top@faces@>Y', 'leg4@faces@<Y', 'Axis')
         .constrain('table_top@vertices@>(1,1,-1)', 'leg4@vertices@>(1,1,1)', 'Point')
 )
-(assy.add(make_side_panel(), name='side_panel1')
+(table_assy.add(make_side_panel(), name='side_panel1')
  .constrain('table_top@faces@<Z', 'side_panel1@faces@>Z', 'Axis')
  .constrain('table_top@faces@<Y', 'side_panel1@faces@>Y', 'Axis')
  .constrain('leg1@vertices@>(1,1,1)', 'side_panel1@vertices@>(-1,1,1)', 'Point')
  )
-(assy.add(make_side_panel(), name='side_panel2')
+(table_assy.add(make_side_panel(), name='side_panel2')
  .constrain('table_top@faces@<Z', 'side_panel2@faces@>Z', 'Axis')
  .constrain('table_top@faces@<Y', 'side_panel2@faces@>Y', 'Axis')
  .constrain('leg3@vertices@>(1,1,1)', 'side_panel2@vertices@>(-1,1,1)', 'Point')
  )
-(assy.add(make_face_frame(), name='face_frame')
+(table_assy.add(make_face_frame(), name='face_frame')
  .constrain('table_top@faces@<Z', 'face_frame@faces@>Z', 'Axis')
  .constrain('table_top@faces@>Y', 'face_frame@faces@>X', 'Axis')
  .constrain('leg4@vertices@>(-1,-1,1)', 'face_frame@vertices@>(-1,1,1)', 'Point')
  )
-(assy.add(make_rear_panel(), name='rear_panel')
+(table_assy.add(make_rear_panel(), name='rear_panel')
  .constrain('table_top@faces@<Z', 'rear_panel@faces@>Z', 'Axis')
  .constrain('table_top@faces@>Y', 'rear_panel@faces@>X', 'Axis')
  .constrain('leg3@vertices@>(1,-1,1)', 'rear_panel@vertices@>(-1,1,1)', 'Point')
  )
-assy.solve()
+
+(table_assy.add(top_assy, name='top_assy')
+.constrain('table_top', table_top.faces('+Y').val(), 'top_assy', top_assy.objects['v_l'].obj.faces('+Y').val(), 'Axis')
+ .constrain('table_top', table_top.vertices('>(-1,-1,1)').val(), 'top_assy', top_assy.objects['v_l'].obj.vertices('>(1,1,1)').val(), 'Point')
+ .constrain('table_top', table_top.faces('+Z').val(), 'top_assy', top_assy.objects['v_l'].obj.faces('+Z').val(), 'Axis')
+
+ )
+table_assy.solve()
+
+# main_assy = (
+#     cq.Assembly()
+#     .add(table_assy.obj, name='table_assy')
+#     .add(top_assy.obj, name='top_assy')
+#     .constrain('table_assy@faces@+Z', 'top_assy@faces@+Z', 'Axis')
+# )
+# main_assy.solve()
+# (assy.add(top_assy, name='top_assy')
+#  .constrain('rear_panel@faces@+Z', 'rear_panel@faces@+Z', 'Axis'))
 show_object(top_assy)
 # legs = table_top.faces("<Z").rect(table_depth-leg_width, table_length-leg_width, forConstruction=True).vertices().rect(leg_width, leg_width).extrude(-leg_length)
