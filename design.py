@@ -102,6 +102,13 @@ def make_wall_frame_vertical_board():
     hole_heights.append((wall_frame_height-hole_heights[1]))
     hole_locations = [(wall_frame_board_width/2-std_thickness/2, wall_frame_height/2 - hh) for hh in hole_heights]
     board = board.faces('>X').workplane().pushPoints(hole_locations).hole(m5_diameter/2, bolt_length)
+    # board.faces('>X').edges('%CIRCLE').tag(f'screws')
+
+    board.faces('>X').edges('%CIRCLE').edges('>Z').tag(f'screw0')
+    board.faces('>X').edges('%CIRCLE').edges('not(>Z)').edges('>Z').tag(f'screw1')
+    # board.faces('>X').edges('%CIRCLE').edges('>Z[-1]').tag(f'screw1')
+    # board.faces('>X').edges('%CIRCLE').edges(f'>Z[1]').tag(f'screw1')
+    # board.faces('>X').edges('%CIRCLE').edges(f'<Z').tag(f'screw3')
     return board
 
 
@@ -131,14 +138,16 @@ top_assy = (
         .constrain('v_l@faces@<Y', 'v_r@faces@<Y', 'Axis')
         .constrain('h_t@vertices@>(1,1,-1)', 'v_r@vertices@>(1,-1,-1)', 'Point')
     .add(make_shelf(), name='shelf')
-    .constrain('h_t@faces@+Z', 'shelf@faces@+Z', 'Axis')
-        .constrain('h_t@faces@+Y', 'shelf@faces@+Y', 'Axis')
     .add(make_shelf_support(), name='shelf_support_left')
     .constrain('shelf?screw_front_left', 'shelf_support_left?screw_front', 'Point')
     .constrain('shelf?screw_rear_left', 'shelf_support_left?screw_rear', 'Plane')
         .add(make_shelf_support(), name='shelf_support_right')
         .constrain('shelf?screw_front_right', 'shelf_support_right?screw_front', 'Point')
         .constrain('shelf?screw_rear_right', 'shelf_support_right?screw_rear', 'Plane')
+        .constrain('v_l?screw0', 'shelf_support_right?screw_top', 'Point')
+        .constrain('v_l?screw1', 'shelf_support_right?screw_bottom', 'Plane')
+        # .constrain('v_r?screw3', 'shelf_support_right?screw_top', 'Point')
+
     # .constrain('shelf@faces@+Z', 'shelf_support_left@faces@+Z', 'Axis')
     # .constrain('h_t', )
 )
@@ -202,5 +211,5 @@ table_assy.solve()
 # main_assy.solve()
 # (assy.add(top_assy, name='top_assy')
 #  .constrain('rear_panel@faces@+Z', 'rear_panel@faces@+Z', 'Axis'))
-show_object(top_assy)
+show_object(table_assy)
 # legs = table_top.faces("<Z").rect(table_depth-leg_width, table_length-leg_width, forConstruction=True).vertices().rect(leg_width, leg_width).extrude(-leg_length)
