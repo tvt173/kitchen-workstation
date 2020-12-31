@@ -130,6 +130,14 @@ def make_wall_frame_horizontal_board():
     return cq.Workplane().box(wall_frame_board_depth, width, wall_frame_board_width)
 
 
+def make_pegboard():
+    pegboard_thickness = 0.5
+    pegboard_height = 50
+    peg_spacing = 2
+    b = cq.Workplane().rect(table_length, 50).rarray(peg_spacing, peg_spacing, table_length // peg_spacing, pegboard_height // peg_spacing).circle(0.5).extrude(pegboard_thickness)
+    return b
+
+
 table_top = cq.Workplane().box(table_depth, table_length, table_top_thickness)
 
 wood_color = cq.Color(203 / 255, 175 / 255, 117 / 255)
